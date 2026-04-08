@@ -19,9 +19,26 @@ Parameters:
     Default: /export/data
     Description: Export path on the NFS server
 
+  NfsMountVersion:
+    Type: String
+    Default: AUTOMATIC
+    AllowedValues:
+      - AUTOMATIC
+      - NFS3
+      - NFS4_0
+      - NFS4_1
+    Description: NFS version used by DataSync to mount the NFS export
+
+  S3DestinationSubdirectory:
+    Type: String
+    Default: migration-output
+    Description: Prefix inside the destination S3 bucket for migrated data
+
 Resources:
   MigrationBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       VersioningConfiguration:
         Status: Enabled
@@ -29,20 +46,28 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-bucket'
         - Key: Purpose
           Value: migration-destination
+        - Key: ManagedBy
+          Value: CloudFormation
 
   DataSyncS3AccessRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${ProjectName}-datasync-s3-role'
+      Description: IAM role that AWS DataSync assumes to access the destination S3 bucket
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Effect: Allow
+          - Sid: AllowDataSyncAssumeRole
+            Effect: Allow
             Principal:
               Service: datasync.amazonaws.com
             Action: sts:AssumeRole
@@ -51,19 +76,33 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Sid: ListBucket
+              - Sid: BucketAccess
                 Effect: Allow
                 Action:
-                  - s3:ListBucket
                   - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
                 Resource: !GetAtt MigrationBucket.Arn
               - Sid: ObjectAccess
                 Effect: Allow
                 Action:
-                  - s3:GetObject
-                  - s3:PutObject
+                  - s3:AbortMultipartUpload
                   - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:GetObjectTagging
+                  - s3:GetObjectVersion
+                  - s3:GetObjectVersionTagging
+                  - s3:ListMultipartUploadParts
+                  - s3:PutObject
+                  - s3:PutObjectTagging
                 Resource: !Sub '${MigrationBucket.Arn}/*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-datasync-s3-role'
+        - Key: Purpose
+          Value: migration-access
+        - Key: ManagedBy
+          Value: CloudFormation
 
   OnPremNfsLocation:
     Type: AWS::DataSync::LocationNFS
@@ -74,10 +113,14 @@ Resources:
         AgentArns:
           - !Ref DataSyncAgentArn
       MountOptions:
-        Version: AUTOMATIC
+        Version: !Ref NfsMountVersion
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-nfs-source'
+        - Key: Purpose
+          Value: migration-source
+        - Key: ManagedBy
+          Value: CloudFormation
 
   S3DestinationLocation:
     Type: AWS::DataSync::LocationS3
@@ -86,10 +129,14 @@ Resources:
       S3Config:
         BucketAccessRoleArn: !GetAtt DataSyncS3AccessRole.Arn
       S3StorageClass: STANDARD
-      Subdirectory: migration-output
+      Subdirectory: !Ref S3DestinationSubdirectory
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-s3-destination'
+        - Key: Purpose
+          Value: migration-destination
+        - Key: ManagedBy
+          Value: CloudFormation
 
   DataMigrationTask:
     Type: AWS::DataSync::Task
@@ -105,11 +152,19 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-datasync-task'
+        - Key: Purpose
+          Value: migration-task
+        - Key: ManagedBy
+          Value: CloudFormation
 
 Outputs:
   BucketName:
     Description: Destination S3 bucket
     Value: !Ref MigrationBucket
+
+  BucketArn:
+    Description: Destination S3 bucket ARN
+    Value: !GetAtt MigrationBucket.Arn
 
   SourceLocationArn:
     Description: DataSync source NFS location ARN
