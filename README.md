@@ -13,24 +13,24 @@ Show how large-scale hybrid data transfers can be structured with YAML-based Inf
 - AWS DataSync S3 destination location
 - AWS DataSync task
 
+## Repository Structure
+- `cloudformation/` – CloudFormation templates
+- `docs/` – architecture and migration notes
+
 ## Hybrid Migration Context
 This project is designed as part of a broader migration approach that can also include:
-- AWS Direct Connect for high-bandwidth private connectivity
-- AWS Site-to-Site VPN for secure network connectivity
-- AWS Snowball Edge for very large offline data transfers
-- AWS Storage Gateway for ongoing hybrid storage integration
-
-## Repository Structure
-- `cloudformation/` – CloudFormation YAML templates
-- `docs/` – notes and later architecture diagrams
+- AWS Direct Connect
+- AWS Site-to-Site VPN
+- AWS Snowball Edge
+- AWS Storage Gateway
 
 ## Security Notes
 - No secrets are stored in this repository
-- Environment-specific values should be passed as parameters
+- Environment-specific values are parameterized
 - Real enterprise network details are intentionally omitted
 
-## What I Learned
-- How to model hybrid migration workflows in YAML
-- How to connect on-premises storage to AWS migration targets
-- How to define IAM access for managed data transfer services
-- How to present migration architecture professionally on GitHubv
+## Roadmap
+- Add architecture diagram
+- Add migration strategy notes
+- Add CI workflow
+- Add optional VPN foundation template
